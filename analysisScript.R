@@ -1,0 +1,1 @@
+# This scripts performs the analysis for understanding Bayesian mixed linear models
