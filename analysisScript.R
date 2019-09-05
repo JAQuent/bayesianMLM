@@ -63,17 +63,95 @@ model3_postDen <- posterior_samples(model3)
 hypothesis(model3, "colorTypeSLC:fillingfilledSpaces = 0")
 plot(hypothesis(model3, "congruencyneutral = 0"))
 
+
+# Priors narrow wide
+model4_priors <- c(prior(normal(0, 1), class = "b")) 
+
+model4 <- brm(scaledRT ~ congruency*colorType*filling + (1 | subNum), 
+              data = stroopData,
+              prior = model4_priors,
+              save_all_pars = TRUE,
+              sample_prior = TRUE,
+              cores = cores2use)
+
+model4_postDen <- posterior_samples(model4)
+
+
+
+model5_priors <- c(prior(normal(0, 0.1), class = "b")) 
+
+model5 <- brm(scaledRT ~ congruency*colorType*filling + (1 | subNum), 
+              data = stroopData,
+              prior = model5_priors,
+              save_all_pars = TRUE,
+              sample_prior = TRUE,
+              cores = cores2use)
+
+model5_postDen <- posterior_samples(model5)
+
+model6_priors <- c(prior(normal(0.5, 1), class = "b")) 
+
+model6 <- brm(scaledRT ~ congruency*colorType*filling + (1 | subNum), 
+              data = stroopData,
+              prior = model6_priors,
+              save_all_pars = TRUE,
+              sample_prior = TRUE,
+              cores = cores2use)
+
+model6_postDen <- posterior_samples(model6)
+
 # Illustration
 df_postDensity_congruency <- data.frame(prior = c(rep('Default', 4000),
                                                   rep('normal(0, 20)', 4000),
-                                                  rep('normal(0, 5)', 4000)),
+                                                  rep('normal(0, 5)', 4000),
+                                                  rep('normal(0, 1)', 4000),
+                                                  rep('normal(0, 0.1)', 4000),
+                                                  rep('normal(0.5, 1)', 4000)),
                                         values = c(model1_postDen[,'b_congruencyneutral'],
                                                    model2_postDen[,'b_congruencyneutral'],
-                                                   model3_postDen[,'b_congruencyneutral']))
+                                                   model3_postDen[,'b_congruencyneutral'],
+                                                   model4_postDen[,'b_congruencyneutral'],
+                                                   model5_postDen[,'b_congruencyneutral'],
+                                                   model6_postDen[,'b_congruencyneutral']))
+
+df_postDensity_congruencyFilling <- data.frame(prior = c(rep('Default', 4000),
+                                                  rep('normal(0, 20)', 4000),
+                                                  rep('normal(0, 5)', 4000),
+                                                  rep('normal(0, 1)', 4000),
+                                                  rep('normal(0, 0.1)', 4000),
+                                                  rep('normal(0.5, 1)', 4000)),
+                                        values = c(model1_postDen[,'b_congruencyneutral:fillingfilledSpaces'],
+                                                   model2_postDen[,'b_congruencyneutral:fillingfilledSpaces'],
+                                                   model3_postDen[,'b_congruencyneutral:fillingfilledSpaces'],
+                                                   model4_postDen[,'b_congruencyneutral:fillingfilledSpaces'],
+                                                   model5_postDen[,'b_congruencyneutral:fillingfilledSpaces'],
+                                                   model6_postDen[,'b_congruencyneutral:fillingfilledSpaces']))
 
 
-ggplot(df_postDensity_congruency, aes(x = values, fill = prior)) +
+ggplot(df_postDensity_congruencyFilling, aes(x = values, fill = prior)) +
   geom_density(alpha = 0.5) 
+
+
+df_postDensity_colorTypeFilling <- data.frame(prior = c(rep('Default', 4000),
+                                                         rep('normal(0, 20)', 4000),
+                                                         rep('normal(0, 5)', 4000),
+                                                         rep('normal(0, 1)', 4000),
+                                                         rep('normal(0, 0.1)', 4000),
+                                                         rep('normal(0.5, 1)', 4000)),
+                                               values = c(model1_postDen[,'b_colorTypeSLC:fillingfilledSpaces'],
+                                                          model2_postDen[,'b_colorTypeSLC:fillingfilledSpaces'],
+                                                          model3_postDen[,'b_colorTypeSLC:fillingfilledSpaces'],
+                                                          model4_postDen[,'b_colorTypeSLC:fillingfilledSpaces'],
+                                                          model5_postDen[,'b_colorTypeSLC:fillingfilledSpaces'],
+                                                          model6_postDen[,'b_colorTypeSLC:fillingfilledSpaces']))
+
+
+ggplot(df_postDensity_colorTypeFilling, aes(x = values, fill = prior)) +
+  geom_density(alpha = 0.5) 
+
+
+hypothesis(model6, 'colorTypeSLC:fillingfilledSpaces = 0') 
+plot(hypothesis(model6, 'colorTypeSLC:fillingfilledSpaces = 0'))
 
 
 # Save current image
