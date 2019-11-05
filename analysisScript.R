@@ -5,6 +5,7 @@ library(brms)
 library(assortedRFunctions)
 library(ggplot2)
 library(lmerTest)
+library(BayesFactor)
 
 # General variables
 cores2use <- 3
@@ -150,12 +151,103 @@ ggplot(df_postDensity_colorTypeFilling, aes(x = values, fill = prior)) +
   geom_density(alpha = 0.5) 
 
 
-hypothesis(model6, 'colorTypeSLC:fillingfilledSpaces = 0') 
+hypothesis(model6, 'colorTypeSLC:fillingfilledSpaces > 0') 
 plot(hypothesis(model6, 'colorTypeSLC:fillingfilledSpaces = 0'))
 
 
-# Save current image
+
+model7 <- brm(scaledRT ~ congruency*colorType*filling, 
+                 data = stroopData,
+                 prior = model3_priors,
+                 save_all_pars = TRUE,
+                 sample_prior = TRUE,
+                 cores = cores2use)
+
+model8 <- brm(scaledRT ~ congruency*colorType*filling + (congruency*colorType*filling | subNum), 
+              data = stroopData,
+              prior = model3_priors,
+              save_all_pars = TRUE,
+              sample_prior = TRUE,
+              cores = cores2use)
+
+
+hypothesis(model8, 'congruencyneutral:colorTypeSLC = 0')
+hypothesis(model8, 'congruencyneutral:fillingfilledSpaces > 0')
+
+fixef(model8)
+
+model9 <- brm(scaledRT ~ congruency + 
+                colorType +
+                filling + 
+                congruency*filling +
+                colorType*filling  + 
+                (congruency + 
+                   colorType +
+                   filling  +
+                   congruency*filling +
+                   colorType*filling  | subNum), 
+              data = stroopData,
+              prior = model3_priors,
+              save_all_pars = TRUE,
+              sample_prior = TRUE,
+              cores = cores2use)
+
+
+bf1 <- bayes_factor(model8, model9)
+
+
+model10 <- brm(scaledRT ~ congruency + 
+                colorType +
+                filling + 
+                 congruency*colorType +
+                congruency*filling +
+                colorType*filling, 
+              data = stroopData,
+              prior = model3_priors,
+              save_all_pars = TRUE,
+              sample_prior = TRUE,
+              cores = cores2use)
+
+model11 <- brm(scaledRT ~ congruency + 
+                 colorType +
+                 filling +
+                 congruency*filling +
+                 colorType*filling, 
+               data = stroopData,
+               prior = model3_priors,
+               save_all_pars = TRUE,
+               sample_prior = TRUE,
+               cores = cores2use)
+
+hypothesis(model8, 'congruencyneutral:colorTypeSLC = 0')
+bf2 <- bayes_factor(model10, model11)
+bf2.2 = anovaBF(scaledRT ~ congruency + 
+                  colorType +
+                  filling + 
+                  congruency*colorType +
+                  congruency*filling +
+                  colorType*filling, data = stroopData, whichModels = 'withmain')
+
+bf2.2[17]/bf2.2[16]
+
+
+model8_ranef <- ranef(model8)
+
+
+
+intercepts <- fixef(model8)[1,1] + as.data.frame(model8_ranef$subNum[,,'Intercept'])[,1]
+slopes     <- fixef(model8)[2,1] + as.data.frame(model8_ranef$subNum[,,'congruencyneutral'])[,1]
+
+df_random_congruency <- data.frame(subNum = c(row.names(random_congruency), row.names(random_congruency)),
+                                   x      = c(rep('incongruent', length(row.names(random_congruency))), rep('neutral', length(row.names(random_congruency)))),
+                                   y      = c(intercepts, intercepts + slopes))
+
+
+ggplot(df_random_congruency, aes(x = x, y = y, colour = subNum, group = subNum)) + geom_line()
+
+
 save.image('currentImage.RData')
+# Delate models that are not needed
 
 # summary(combinedData_case1_model)
 # hypothesis(combinedData_case1_model, "IobjLocTargetRatingMUobjLocTargetRating = 0")
