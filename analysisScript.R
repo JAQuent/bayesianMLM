@@ -47,13 +47,65 @@ model_full_exGauss <- brm(sRT ~ congruency + (congruency | subNum) + (1 | stimul
                           sample_prior = TRUE,
                           cores = cores2use)
 
+
+## Weakly informative prior, very weak based on reccommendations of Andrew Gelman
+get_prior(bf(sRT ~ congruency + (congruency | subNum) + (1 | stimulus),
+             sigma ~ congruency + (congruency | subNum) + (1 | stimulus),
+             beta ~ congruency + (congruency | subNum) + (1 | stimulus)),
+          family = exgaussian(link = "identity", link_sigma = "log", link_beta = "log"),
+          data = stroopData)
+
+
+
+stroopData$sRT <- scale(stroopData$RT)
+
+priors <- c(prior(normal(0, 1), class = "Intercept"),
+            prior(normal(0, 1), class = "b", coef = 'congruencyneutral'),
+            prior(normal(0, 0.25), class = "b", coef = 'congruencyneutral', dpar = 'sigma'),
+            prior(normal(0, 0.25), class = "b", coef = 'congruencyneutral', dpar = 'beta')) 
+
+
 # Running full model distrubtional ex-Gaussian
-model_full_exGauss <- brm(bf(sRT ~ congruency + (congruency | subNum) + (1 | stimulus),
-                             sigma ~ congruency + (congruency | subNum) + (1 | stimulus), 
-                             beta ~ congruency + (congruency | subNum) + (1 | stimulus)),
-                          family = exgaussian(link = "identity", link_sigma = "log", link_beta = "log"),
-                          data = stroopData,
-                          prior = priors,
-                          save_all_pars = TRUE,
-                          sample_prior = TRUE,
-                          cores = cores2use)
+exGauss_full_exGauss_noRanef <- brm(bf(sRT ~ congruency,
+                                       sigma ~ congruency,
+                                       beta ~ congruency),
+                                    family = exgaussian(link = "identity", 
+                                                        link_sigma = "log", 
+                                                        link_beta = "log"),
+                                    prior = priors,
+                                    data = stroopData,
+                                    save_all_pars = TRUE,
+                                    sample_prior = TRUE,
+                                    cores = cores2use)
+summary(exGauss_full_exGauss_noRanef)
+
+
+
+# Running full model distrubtional ex-Gaussian
+exGauss_full_exGauss_1RanInt <- brm(bf(sRT ~ congruency + (1 | subNum),
+                                       sigma ~ congruency,
+                                       beta ~ congruency),
+                                   family = exgaussian(link = "identity", 
+                                                       link_sigma = "log", 
+                                                       link_beta = "log"),
+                                   prior = priors,
+                                   data = stroopData,
+                                   save_all_pars = TRUE,
+                                   sample_prior = TRUE,
+                                   cores = cores2use)
+
+exGauss_full_exGauss_1RanSlope <- brm(bf(sRT ~ congruency + (congruency | subNum),
+                                         sigma ~ congruency,
+                                         beta ~ congruency),
+                                      family = exgaussian(link = "identity", 
+                                                        link_sigma = "log", 
+                                                        link_beta = "log"),
+                                      prior = priors,
+                                      data = stroopData,
+                                      save_all_pars = TRUE,
+                                      sample_prior = TRUE,
+                                      cores = cores2use)
+
+pp_check(exGauss_full_exGauss_1RanSlope)
+marginal_effects(exGauss_full_exGauss_1RanSlope)
+bayes_factor(exGauss_full_exGauss_noRanef, exGauss_full_exGauss_1RanSlope)

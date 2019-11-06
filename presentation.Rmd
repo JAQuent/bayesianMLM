@@ -2,21 +2,26 @@
 title: "Bayesian multilevel models"
 author: "Jörn Alexander Quent"
 date: "11 November 2019"
-output: ioslides_presentation
+output: slidy_presentation
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 library(plyr)
+library(brms)
+library(ggplot2)
+library(MRColour)
+library(cowplot)
+theme_set(theme_grey())
 
-load("~/GitHub/bayesianMLM/exampleData/stroopData.RData")
+load("U:/Projects/bayesianMLM/currentImage.RData")
 
 n         <- length(unique(stroopData$subNum))
 trialNum  <- ddply(stroopData, c('subNum'), summarise, trialsNum = length(RT))
 ```
 
-## Example data
+# Example data
 * Using a mutlilevel approach that includes stimulus and participants as crossed random effects (Judd et al., 2012). 
 * Stroop task:
     + `r n` participants,
@@ -25,13 +30,18 @@ trialNum  <- ddply(stroopData, c('subNum'), summarise, trialsNum = length(RT))
 
 $$RT \sim congruency + (congruency | subNum) + (1 | stimulus)$$
 
-## BRMS vs. lme4
-- Most functions still work, e.g. `ranef()` or `fixef()`.
-- Syntax the same (or very similar)
-![lme4 syntax](lme4Syntax.png)
+# BRMS vs. lme4
+Syntax the same
 
-## Our BRMS model
-```{r eval = false}
+![](lme4Syntax.png)
+
+# BRMS vs. lme4
+- Most functions still work, e.g. `ranef()` or `fixef()`.
+- etc.
+- BRMS uses MCMC etc.
+
+# Our BRMS model
+```{r,  eval = FALSE, echo= TRUE}
 # Priors based on reccommendations of Andrew Gelman
 priors <- c(prior(normal(0, 1), class = "Intercept"),
             prior(normal(0, 1), class = "b")) 
@@ -45,65 +55,159 @@ model_full <- brm(sRT ~ congruency + (congruency | subNum) + (1 | stimulus),
                   cores = cores2use)
 ```
 
+# Our BRMS model
+```{r}
+pp_check(model_full)
+```
+
+As we see in the posterior predictive check, a Gaussian distrubtion is the wrong link function. 
+
+# Our BRMS model
+```{r}
+ggplot(stroopData, aes(x = RT)) + geom_histogram() + labs(x = 'Reaction time (msec)', y = 'Count', title = 'Histogram across all trials')
+```
+
+# Our BRMS model
+- There is a considerable body literature that RT data follows an ex-Gaussian distribution rather than normal. 
+- For mean data is doesn't matter because of central limit theorem but for non-aggregated data it does. 
+
+# Our BRMS model
+```{r}
+exGauss_dist <- data.frame(x = rexgaussian(1000, 700, 0.5, 1))
+ggplot(exGauss_dist, aes(x = x)) + geom_histogram() + labs(x = 'a.u.', y = 'Count', title = 'Histogram of ex-Gaussian variable')
+```
+
+# Our BRMS model
+```{r,  eval = FALSE, echo= TRUE}
+model_full_exGauss <- brm(sRT ~ congruency + (congruency | subNum) + (1 | stimulus), 
+                          family = exgaussian(link = "identity", 
+                                              link_sigma = "log", 
+                                              link_beta = "log"),
+                          data = stroopData,
+                          prior = priors,
+                          save_all_pars = TRUE,
+                          sample_prior = TRUE,
+                          cores = cores2use)
+```
+
+# Our BRMS model
+```{r}
+pp_check(model_full_exGauss)
+```
+
 
 # What so special about Bayesian linear models
 
-## Bayesian multilevel models
-- Shrinkage priors
-- Estimating parameters with standard error
- - shape: explain how they can vary across groups etc. name stroop as example
- - random effects
- 
- - Let $\alpha$ be the common intercept and $\boldsymbol{\beta}$ be the common coefficients while
-  $a_j$ is the deviation from the common intercept in the $j$-th group and $\mathbf{b}_j$ is
-  the deviation from the common coefficients. Write the model as:
-$$y_{ij} = \overbrace{\underbrace{\alpha + \sum_{k = 1}^K \beta_k x_{ik}}_{\mbox{Frequentist }
-\boldsymbol{\mu} \mid \mathbf{x}} + a_j + \sum_{k = 1}^K b_{jk} x_{ik}}^{\mbox{Bayesian } \boldsymbol{\mu} \mid \mathbf{x},j} +\boldsymbol{\epsilon} = \\ \alpha + \sum_{k = 1}^K \beta_k x_{ik}+\underbrace{a_j + \sum_{k = 1}^K b_{jk} x_{ik}\overbrace{\boldsymbol{\epsilon}}^{\mbox{Bayesian error}}}_{\mbox{Frequentist error}}$$
+# Bayesian multilevel models
+Let $\alpha$ be the common intercept and $\boldsymbol{\beta}$ be the common coefficients while $a_j$ is the deviation from the common intercept in the $j$-th group and $\mathbf{b}_j$ is the deviation from the common coefficients. 
+Write the model as:
+$$y_{ij} = \alpha + \sum_{k = 1}^K \beta_k x_{ik}+\underbrace{a_j + \sum_{k = 1}^K b_{jk} x_{ik}\overbrace{\boldsymbol{\epsilon}}^{\mbox{Bayesian error}}}_{\mbox{Frequentist error}}$$
 
-Ben Goodrich, 2019 (https://mc-stan.org/workshops/stancon2019_hierarchical/) 
+Ben Goodrich, [Cambridge 2019](https://mc-stan.org/workshops/stancon2019_hierarchical/) 
 
-# Bayes factor
+# Bayesian multilevel models
+- Providing standard error and CI for parameters:
+    + Random effects (lme4: `ranef()`)
+    + Family parameters (lme4: `sigma()`)
+- Using priors for
+    + Shrinkage,
+    + or using prior information. 
+
+
+# Our BRMS model
+\small
+```{r}
+summary(model_full_exGauss)
+```
+\normalsize
+
+# Bayesian interence
+
+# Credible intervall
+
+# Bayes factors
 
 $$ BF_{10} =\frac{likelihood\ of\ data\ given\ H_1}{likelihood\ of\ data\ given\ H_o} = \frac{P(D|H_1)}{P(D|H_0)}$$
-- Instead of integrating out marginal likelihoods, MCMC is used. 
+- Instead of integrating out marginal likelihoods analytically, MCMC is used. 
 
 # MCMC
 - one slide explaining this
 
+# A word on priors
+- cautious,
+- scaling is important
+
+# Bayes factors
+- bayes_factor, 
+- hypothesis, savage-dickey-ratio (special caveat about priors)
+- general caveat of priors with example
+
+# Bayes factor(s) from marginal likelihoods
+- explain bayes_factor()
+
+# Savage-Dickey density ratio
+- One way of calculating BF for point hypotheses is the Savage-Dickey density ratio (see Wagenmakers et al., 2010).
+- For testing whether a parameter is zero:
+$$ BF_{10} = \frac{p(D|H_{1})}{p(D|H_{0})} = \frac{p(\theta = 0|D,H_{1})}{p(\theta = 0|D,H_{0})}$$
+
+# Savage-Dickey density ratio
+```{r}
+# Calculate points
+priorDenPoint1 <- dnorm(0, 0, 1)
+postDenPoint1  <- dnorm(0, 1.1, 0.5)
+
+
+exampleDenPoints <- data.frame(Distribution = c('Prior', 'Posterior', 'Post 2', 'Post 3'),
+                               x = c(0, 0),
+                               Density = c(priorDenPoint1,
+                                           postDenPoint1))
+
+exampleBF <- data.frame(Case = c('Case 1'),
+                        BF10 = c(1/(postDenPoint1/priorDenPoint1)))
 
 
 
- 
+xValues <- seq(-.5, 3, by = .01)
+exampleDensityCurves <- data.frame(Distribution = c(rep('Prior', length(xValues)), 
+                                                    rep('Posterior', length(xValues))),
+                                   Parameter = xValues,
+                                   Density =c(dnorm(xValues, 0, 1),
+                                              dnorm(xValues, 1.1, 0.5)))
+
+
+examplePlot <- ggplot(exampleDensityCurves, aes(x = Parameter, y = Density, colour = Distribution)) +
+  geom_line() +
+  theme(legend.position = c(1, 1),
+        legend.justification = c(1, 1),
+        plot.margin = unit(c(1,1,1,1), "lines"))
+
+exampleZoomPlot <- ggplot(exampleDensityCurves, aes(x = Parameter, y = Density, colour = Distribution)) +
+  geom_line() +
+  geom_point(data = exampleDenPoints, aes(x = x, y = Density)) +
+  annotate('text', x = 0, y = postDenPoint1-0.0001, label = as.character(round(postDenPoint1, 6))) +
+  annotate('text', x = 0, y = priorDenPoint1-0.0001, label = as.character(round(priorDenPoint1, 6))) +
+  coord_cartesian(ylim = c(0,
+                           max(exampleDenPoints$Density)*1.1),
+                  xlim = c(-0.1,
+                           0.1),
+                  expand = FALSE) +
+  theme(legend.position = "none",
+        plot.margin = unit(c(1,1,1,1), "lines"))
+
+plot_grid(examplePlot, exampleZoomPlot)
+```
+
 
 # Meta analysis
 - sequential versus combinted analysis
 - random effect analysis
 
-
-# A word on priors
-- cautioes,
-- scaling is important
-
-# Inference
-- CI (can be interpreted without priors)
-- Bayes factors
-
-# Bayes factors
-- bayes_factor, hypothesis
-- savage-dickey-ratio (special caveat about priors)
-- general caveat of priors with example
-
-# Predictive checks
-
-# Ex-gauss
-Analysis of Response Time Distributions: An Example Using the Stroop Task
-plot exgus
-
 # Drawback
 - takes more time
 - Added complexity with priors, requires you to be more careful. 
-- Pay attention to warnings
-
+- Pay attention to warnings:
+    + No convergence and divergernces are a problem. 
+    + $\hat{R}$ must not be higher than 1. 
 # Resources
 - gelmann book
 - etz paper
