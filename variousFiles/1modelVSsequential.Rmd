@@ -230,7 +230,7 @@ kable(fixef(model_bothFixedEffects))
 kable(fixef(model_data2))
 ```
 
-There is still a small difference between both analyses but it is smaller. The density distribution is still shifted to the right in the sequential analysis. 
+There is still a small difference between both analyses but it is sdmaller. The density distribution is still shifted to the right in the sequential analysis. 
 
 ```{r}
 # Posterior density

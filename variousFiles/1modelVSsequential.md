@@ -208,7 +208,7 @@ ggplot(data.frame(model_data1_postDen$b_scaledx), aes(x = model_data1_postDen$b_
 
 ![](1modelVSsequential_files/figure-markdown_github/unnamed-chunk-6-1.png)
 
-The red line is considerably lower at the mode of the distribution. Therefore, I will now try a student distribution. So I start with using `brms`.
+The red line is considerably lower at the mode of the distribution. Therefore, I will now try a student distribution. So I start with using `brms` to fit a student distribution to the posterior distribution of model 1.
 
 ``` r
 student_fit <- brm(b_scaledx ~ 1,
@@ -236,12 +236,12 @@ ggplot(data.frame(model_data1_postDen$b_scaledx), aes(x = model_data1_postDen$b_
 
 ![](1modelVSsequential_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
+The student distribution provides a much better fit to the posterior distribution than a normal distribution.
+
 Analysis with student prior
 ===========================
 
-``` r
-load("U:/Projects/bayesianMLM/variousFiles/1modelVSsequential_studentPriors.RData")
-```
+As a test, I run the analysis again this time using student priors.
 
 ``` r
 kable(fixef(model_bothFixedEffects))
@@ -261,6 +261,8 @@ kable(fixef(model_data2))
 | Intercept |  0.0007407|  0.1438661|  -0.2845276|  0.2847372|
 | scaledx   |  0.4155237|  0.1506284|   0.1155835|  0.7081582|
 
+There is still a small difference between both analyses but it is sdmaller. The density distribution is still shifted to the right in the sequential analysis.
+
 ``` r
 # Posterior density
 model_bothFixedEffects_postDen <- posterior_samples(model_bothFixedEffects)
@@ -276,6 +278,8 @@ ggplot(df_postDensity, aes(x = values, fill = method)) +
 ```
 
 ![](1modelVSsequential_files/figure-markdown_github/unnamed-chunk-12-1.png)
+
+Unsurprisingly, the BF are also different.
 
 ``` r
 hypo1  <- hypothesis(model_bothFixedEffects, 'scaledx = 0')
