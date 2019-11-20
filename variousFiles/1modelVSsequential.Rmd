@@ -223,14 +223,14 @@ The student distribution provides a much better fit to the posterior distributio
 load("U:/Projects/bayesianMLM/variousFiles/1modelVSsequential_studentPriors.RData")
 ```
 
-As a test, I run the analysis again this time using student priors. 
+As a test, I run the analysis again this time using student priors. The analysis script can be found [here]((https://github.com/JAQuent/bayesianMLM/blob/master/variousFiles/1modelVSsequential_studentPriors.R).
 
 ```{r}
 kable(fixef(model_bothFixedEffects))
 kable(fixef(model_data2))
 ```
 
-There is still a small difference between both analyses but it is sdmaller. The density distribution is still shifted to the right in the sequential analysis. 
+There is still a small difference between both analyses but it is smaller. The density distribution is still shifted to the right in the sequential analysis. 
 
 ```{r}
 # Posterior density
@@ -260,3 +260,6 @@ BF10_2 <- 1/(hypo2$hypothesis$Evid.Ratio * hypo3$hypothesis$Evid.Ratio)
 kable(data.frame(Analysis = c('Pooled analysis', 'Sequential analysis'),
                  BF10 = c(BF10_1, BF10_2)))
 ```
+
+## Conclusion
+Is that observed difference just noise or is it actually shifted?
