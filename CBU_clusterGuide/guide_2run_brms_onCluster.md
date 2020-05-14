@@ -53,8 +53,12 @@ install.packages('rslurm')
 
 You might also need to Create a file \~/.R/Makevars
 
-And put the following in it: CXX14 = g++ -std=c++1y CXX14FLAGS = -O3
--Wno-unused-variable -Wno-unused-function –fPIC
+And put the following in it:
+
+``` file
+CXX14 = g++ -std=c++1y
+CXX14FLAGS = -O3 -Wno-unused-variable -Wno-unused-function –fPIC
+```
 
 # Step 1: Create script that compiles a slurm job.
 
@@ -351,4 +355,4 @@ summary(fullModel)
 plot(marginal_effects(fullModel), ask = FALSE)
 ```
 
-![](guide_2run_brms_onCluster_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](guide_2run_brms_onCluster_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
