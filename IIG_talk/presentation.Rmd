@@ -17,7 +17,7 @@ theme_set(theme_grey())
 
 options(scipen = 10)
 
-load("U:/Projects/bayesianMLM/logRT_model.RData")
+load("U:/Projects/bayesianMLM/IIG_talk/logRT_model.RData")
 
 n         <- length(unique(stroopData$subNum))
 trialNum  <- ddply(stroopData, c('subNum'), summarise, trialsNum = length(RT))
@@ -164,8 +164,6 @@ ggplot(df, aes(x = Congruency, y = RT, group = ID)) +
   geom_line(alpha = 0.1) + 
   labs(y = 'scaled log(RT)', title = 'Draws of population-level effect')
 ```
-
-
 
 # What so special about Bayesian linear models
 Instead of point estimates for $\beta_{0ij}$ and $\beta_{1ij}$, we get *posterior* distributions (`iter/2` x `chains` = `r 8*1500` samples):
