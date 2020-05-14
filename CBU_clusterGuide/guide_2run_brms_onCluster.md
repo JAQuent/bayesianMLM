@@ -51,6 +51,11 @@ install.packages('brms')
 install.packages('rslurm')
 ```
 
+You might also need to Create a file \~/.R/Makevars
+
+And put the following in it: CXX14 = g++ -std=c++1y CXX14FLAGS = -O3
+-Wno-unused-variable -Wno-unused-function –fPIC
+
 # Step 1: Create script that compiles a slurm job.
 
 The whole script can be found
