@@ -48,6 +48,7 @@ CXX14 = g++ -std=c++1y
 CXX14FLAGS = -O3 -Wno-unused-variable -Wno-unused-function –fPIC
 ```
 
+
 # Step 1: Create script that compiles a slurm job. 
 The whole script can be found [here](https://github.com/JAQuent/bayesianMLM/blob/master/CBU_clusterGuide/logRT_model_rslurm.R).
 

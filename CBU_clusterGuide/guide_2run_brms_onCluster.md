@@ -53,12 +53,17 @@ install.packages('rslurm')
 
 You might also need to Create a file \~/.R/Makevars
 
+<<<<<<< HEAD
 And put the following in it:
 
 ``` file
 CXX14 = g++ -std=c++1y
 CXX14FLAGS = -O3 -Wno-unused-variable -Wno-unused-function –fPIC
 ```
+=======
+And put the following in it: CXX14 = g++ -std=c++1y CXX14FLAGS = -O3
+-Wno-unused-variable -Wno-unused-function –fPIC
+>>>>>>> 4d4bc5a45cc53e9fbc59e1d5501970fb9d7b5f5d
 
 # Step 1: Create script that compiles a slurm job.
 
