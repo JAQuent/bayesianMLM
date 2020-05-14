@@ -1,12 +1,12 @@
-# Script to combine all model for schemaVR1
+# Script to get data from slurm jobs and combine to one model
 # Version 1.0
-# Date:  19/11/2019
+# Date:  14/05/2020
 # Author: Joern Alexander Quent
 # /* 
 # ----------------------------- Libraries, settings and functions ---------------------------
 # */
 # Clear workspace
-rm(list = ls())
+rm(list = ls()) # Not necessary but sometimes the files we load are quite large
 
 # Libraries
 library(brms)
@@ -15,6 +15,7 @@ library(rslurm)
 # List of all parent folders
 pathParentFolder <- c("U:/Projects/bayesianMLM/CBU_clusterGuide")
 
+# This is the pattern that our result folder have
 pattern <- '_rslurm_'
 
 # /* 

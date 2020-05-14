@@ -30,8 +30,7 @@ cpus_per_node <- nRuns # 1 cpu per run
 # ----------------------------- Preparing data and priors ---------------------------
 # */
 # Loading data
-load("/home/aq01/Projects/bayesianMLM/IIG_talk/exampleData/stroopData.RData")
-
+load("/home/aq01/Projects/bayesianMLM/CBU_clusterGuide/exampleData/stroopData.RData")
 
 # Pre processing
 # Log transform to make closer to normal

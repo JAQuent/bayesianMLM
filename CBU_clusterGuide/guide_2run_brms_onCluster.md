@@ -1,83 +1,307 @@
 Guide to run BRMS on CBU cluster
 ================
+Joern Alexander Quent
+14 May, 2020
 
-Preamble
-========
+  - [Preamble](#preamble)
+  - [Step 0: Set up your access to CBU cluster and
+    R.](#step-0-set-up-your-access-to-cbu-cluster-and-r.)
+  - [Step 1: Create script that compiles a slurm
+    job.](#step-1-create-script-that-compiles-a-slurm-job.)
+  - [Step 2: Running that script.](#step-2-running-that-script.)
+  - [Step 3: Submit the slurm job to the
+    cluster.](#step-3-submit-the-slurm-job-to-the-cluster.)
+  - [Step 4: Import the results.](#step-4-import-the-results.)
+  - [Step 5: Inspecting the results.](#step-5-inspecting-the-results.)
 
-This is a guide how to use the package *brms* on the high performance computer cluster at the MRC CBU.
+# Preamble
 
-You need:
+This is a guide how to use the package *brms* on the high performance
+computer cluster at the MRC CBU. To demonstrate this, we run the RT
+analysis from my [IIG
+talk](https://github.com/JAQuent/bayesianMLM/tree/master/IIG_talk) again
+fitting a full and null model.
 
-Step 0: Set up your access to the CBU cluster and R.
-====================================================
+Running *brms* can take ages and use up your computer. In this guide, I
+show how to use the CBU cluster to run BRMS with using the job
+scheduler.
+
+# Step 0: Set up your access to CBU cluster and R.
 
 1.  Log on to a node with PuTTY.
-    -   Note that not all nodes work.
-    -   In my case I use login node 25.
-2.  Start VNC server.
-3.  Connect to the virtual machine via TurboVNC connection. Use the correct login node (e.g. login25:6).
+      - Note that not all nodes work.
+      - In my case I use login node 25.
+2.  Start VNC server by typing vncsever into the PuTTY window.
+3.  Connect to the virtual machine via TurboVNC connection. Use the
+    correct login node (e.g. login25:6).
 
-You also need to install the packages (*brms* & *rslurm*) that you need to run everything. To do this type R in the terminal. And do something like this
+You also need to install the packages (*brms* & *rslurm*) that you need
+to run everything. To do this type R in the terminal. And do something
+like this
 
 ``` r
 .libPaths("/home/aq01/R/x86_64-redhat-linux-gnu-library/3.5")
 ```
 
-Then you should be able to install *brms* and *rslurm* so you can use it on the cluster. Just type in these lines into your open R window:
+Then you should be able to install *brms* and *rslurm* so you can use it
+on the cluster. Just type in these lines into your open R window:
 
 ``` r
 install.packages('brms')
 install.packages('rslurm')
 ```
 
-Step 1: Create script that compiles a slurm job.
-================================================
+# Step 1: Create script that compiles a slurm job.
 
-The whole script can be found here.
+The whole script can be found
+[here](https://github.com/JAQuent/bayesianMLM/blob/master/CBU_clusterGuide/logRT_model_rslurm.R).
 
-Step 2: Running that script.
-============================
+The basic idea is that we run a *brms* model eight times with only one
+chain. This allows us to run those eight models in parallel saving a
+model time even though the whole process is cumbersome to set-up at
+first.
+
+We start with setting the seed and loading the libraries.
+
+``` r
+# Setting seed
+seed <- 13846
+
+# Libaries
+library(brms)
+library(rslurm)
+```
+
+In the next step we specify the parameters for the analysis.
+
+``` r
+# BRMS parameters
+chains       <- 1    # One chain per model
+nRuns        <- 8    # How many runs/models
+iterPerChain <- 4000 # How many samples per run
+seeds1       <- sample(99999, nRuns)
+seeds2       <- sample(99999, nRuns)
+
+# Job parameters
+n_nodes       <- 1
+cpus_per_node <- nRuns # 1 cpu per run
+```
+
+We specified the paramters so that we run 32000 samples in total. Half
+of which will be warm-up samples, so we’re left with 16000 samples to
+analyse. We also create a set of eight random seeds for both of our
+models.
+
+Now, we load our raw data, prepare and set our priors in the same way we
+would for a normal *brms* analysis.
+
+``` r
+# Loading data
+load("/home/aq01/Projects/bayesianMLM/CBU_clusterGuide/exampleData/stroopData.RData")
+
+# Pre processing
+# Log transform to make closer to normal
+stroopData$logRT   <- log(stroopData$RT)
+
+# Then scale to mean = 0 and sd = 1
+stroopData$s_logRT <- scale(stroopData$logRT)
+
+# Priors
+priors_full <- c(prior(normal(0, 1), class = "Intercept"), 
+                 prior(normal(0, 1), class = "b"))
+
+priors_null <- c(prior(normal(0, 1), class = "Intercept"))
+
+pars_full  <- data.frame(i = 1:nRuns, seed = seeds1)
+pars_null  <- data.frame(i = 1:nRuns, seed = seeds2)
+```
+
+In addition to loading the data and setting priors, we also create two
+data.frames (`pars_full` and `pars_null`) that are basically only need
+to contain the seeds to be used for *brms*.
+
+Every time you run `brm()` a model is compile, which takes a lot of
+time. We can circumvent this by a model one time and then just use the
+`update()` to run it again. So, we start with running our first model
+that will:
+
+``` r
+starterModel_full  <- brm(s_logRT ~ congruency + (congruency | subNum) + (1 | stimulus),
+                          data = stroopData,
+                          prior = priors_full,
+                          cores = 1,
+                          chains = 1,
+                          iter = iterPerChain,
+                          save_all_pars = TRUE,
+                          sample_prior = TRUE,
+                          save_dso = TRUE, 
+                          seed = pars_full[1, 'seed']) 
+```
+
+Now, that this model is compiled, we can create a helper function that
+does nothing more than using the `update()` function to run the same
+model multiple times, while using a specified seed (see `pars_full`)
+every time.
+
+``` r
+helper1<- function(i, seed){
+  if(i == 1){
+    return(list(i = i,
+                seed = seed,
+                model = starterModel_full))
+  } else {
+    model_full <- update(starterModel_full,
+                         newdata = stroopData,
+                         recompile = FALSE,
+                         cores = 1,
+                         chains = 1,
+                         iter = iterPerChain,
+                         save_all_pars = TRUE,
+                         sample_prior = TRUE,
+                         save_dso = TRUE,
+                         seed = seed)
+    return(list(i = i,
+                seed = seed,
+                model = model_full))
+  }
+}
+```
+
+As a last step, we create a job using `slurm_apply`:
+
+``` r
+sjob1 <- slurm_apply(helper1, pars_full, jobname = 'fullModel',
+                     add_objects = c("starterModel_full", 'stroopData', 'priors_full', 'iterPerChain'),
+                     nodes = n_nodes, cpus_per_node = cpus_per_node, submit = FALSE)
+```
+
+Here, it’s important to use the argument `add_objects` to add everything
+that this analysis needs to run (e.g. data and priors).
+
+# Step 2: Running that script.
 
 1.  Open terminal change directory (cd) to the correct folder.
 
-2.  Run the script that creates shell script that can be submited to the cluster.
+2.  Run the script that creates shell script that can be submited to the
+    cluster.
+
+<!-- end list -->
 
 ``` terminal
-cd /home/aq01/Projects/bayesianMLM/IIG_talk/
+cd /home/aq01/Projects/bayesianMLM/CBU_clusterGuide/
 Rscript logRT_model_rslurm.R
 ```
 
-Step 3: Submit the slurm job to the cluster.
-============================================
+When [this
+script](https://github.com/JAQuent/bayesianMLM/blob/master/CBU_clusterGuide/logRT_model_rslurm.R)
+was run succesfully, there will be two new folders in the directory name
+`_rslurm_fullModel` and `_rslurm_nullModel`.
 
-When the script above is finished running, you see it has created two new folders in your directory. In order to submit the job for the full model, you need to cd into that folder and run the shell script (submit.sh).
+# Step 3: Submit the slurm job to the cluster.
+
+In order to submit the job for the full model, we need to cd into that
+folder and run the shell script (submit.sh).
 
 ``` terminal
-cd /home/aq01/Projects/bayesianMLM/IIG_talk/_rslurm_fullModel/
+cd /home/aq01/Projects/bayesianMLM/CBU_clusterGuide/_rslurm_fullModel/
 sbatch submit.sh
 ```
 
-For the null model you need to do the same:
+For the null model we need to do the same:
 
 ``` terminal
-cd /home/aq01/Projects/bayesianMLM/IIG_talk/_rslurm_nullModel/
+cd /home/aq01/Projects/bayesianMLM/CBU_clusterGuide/_rslurm_nullModel/
 sbatch submit.sh
 ```
 
-Step 4: Get the results.
-========================
+We get confirmation that the job was submitted, however we don’t see
+when it’s finished. A work-out is to look at the file size of the file
+`results_0.RDS` in `_rslurm_` directories. If this file has more than 1
+KB, then it’s done.
 
-In this last step, we get the date and bring it into a format that can used by us for analysis.
+# Step 4: Import the results.
 
-Step 5: The end
-===============
+In this last step, we get the date and bring it into a format that can
+used by us for analysis. In our exmaple, this is achivied with [this
+script](https://github.com/JAQuent/bayesianMLM/blob/master/CBU_clusterGuide/getData_fromSLURM.R).
 
-With the last step you can now just load your image you just saved and analyse the results:
+We start with loading the libaries and setting the corrects paths.
 
 ``` r
-# Load results
-load("U:/Projects/bayesianMLM/CBU_clusterGuide/combinedModels.RData")
+# Clear workspace 
+rm(list = ls()) # Not necessary but sometimes the files we load are quite large
 
+# Libraries
+library(brms)
+library(rslurm)
+
+# List of all parent folders
+pathParentFolder <- c("U:/Projects/bayesianMLM/CBU_clusterGuide")
+
+# This is the pattern that our result folder have
+pattern <- '_rslurm_'
+```
+
+In the next step, we find all `rslurmFolders` and for each of them get
+our `results_0.RDS` file that contains the results. This file needs to
+be loaded with `readRDS()` and then we use `combine_models()` to create
+one model from all the individuals that we have run and are stored in a
+`list`.
+
+``` r
+for(i in 1:length(pathParentFolder)){
+  # Get all rslurm folders in that parent folder
+  allFiles      <- list.files(pathParentFolder[i])
+  rslurmFolders <- allFiles[grepl(pattern, allFiles)]
+  modelNames    <- gsub(paste0(pattern, '(.+)'), '\\1', rslurmFolders)
+  
+  # Go through all folders in that parent folder
+  for(j in 1:length(rslurmFolders)){
+    # Read rlsurm file
+    tempList <- readRDS(paste0(pathParentFolder[i],
+                               '/', 
+                               rslurmFolders[j], 
+                               '/results_0.RDS'), 
+                        refhook = NULL)
+    
+    # Combine all 8 runs of the model
+    tempModel <- combine_models(tempList[[1]]$model,
+                                tempList[[2]]$model,
+                                tempList[[3]]$model,
+                                tempList[[4]]$model,
+                                tempList[[5]]$model,
+                                tempList[[6]]$model,
+                                tempList[[7]]$model,
+                                tempList[[8]]$model)
+    
+    # Assign to model name that is taken from folder name
+    assign(modelNames[j], tempModel)
+  }
+}
+```
+
+As a last step, we remove unnecessary files and save the image so we can
+analyse this with other scripts and don’t have to do this again.
+
+``` r
+# Remove temporary files
+rm('tempList')
+rm('tempModel')
+
+# Save image
+save.image('combinedModels.RData')
+```
+
+# Step 5: Inspecting the results.
+
+With the last step you can now just load your image you just saved and
+analyse the results:
+
+``` r
+library(brms)
+
+# Load results
+load("combinedModels.RData")
 
 # Inspect results
 summary(fullModel)
@@ -92,28 +316,34 @@ summary(fullModel)
     ## 
     ## Group-Level Effects: 
     ## ~stimulus (Number of levels: 8) 
-    ##               Estimate Est.Error l-95% CI u-95% CI Eff.Sample Rhat
-    ## sd(Intercept)     0.05      0.03     0.00     0.12       5417 1.00
+    ##               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+    ## sd(Intercept)     0.05      0.03     0.00     0.12 1.00     4730     5498
     ## 
     ## ~subNum (Number of levels: 26) 
-    ##                                  Estimate Est.Error l-95% CI u-95% CI
-    ## sd(Intercept)                        0.54      0.08     0.41     0.73
-    ## sd(congruencyneutral)                0.25      0.05     0.17     0.36
-    ## cor(Intercept,congruencyneutral)    -0.65      0.14    -0.86    -0.33
-    ##                                  Eff.Sample Rhat
-    ## sd(Intercept)                          3041 1.00
-    ## sd(congruencyneutral)                  5376 1.00
-    ## cor(Intercept,congruencyneutral)       7340 1.00
+    ##                                  Estimate Est.Error l-95% CI u-95% CI Rhat
+    ## sd(Intercept)                        0.54      0.08     0.41     0.73 1.00
+    ## sd(congruencyneutral)                0.25      0.05     0.17     0.36 1.00
+    ## cor(Intercept,congruencyneutral)    -0.65      0.14    -0.86    -0.33 1.00
+    ##                                  Bulk_ESS Tail_ESS
+    ## sd(Intercept)                        3101     5209
+    ## sd(congruencyneutral)                5491     8580
+    ## cor(Intercept,congruencyneutral)     7180    10098
     ## 
     ## Population-Level Effects: 
-    ##                   Estimate Est.Error l-95% CI u-95% CI Eff.Sample Rhat
-    ## Intercept             0.11      0.11    -0.10     0.34       2070 1.00
-    ## congruencyneutral    -0.23      0.07    -0.36    -0.09       4192 1.00
+    ##                   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+    ## Intercept             0.11      0.11    -0.10     0.34 1.00     2054     3871
+    ## congruencyneutral    -0.23      0.07    -0.36    -0.09 1.00     4216     7105
     ## 
     ## Family Specific Parameters: 
-    ##       Estimate Est.Error l-95% CI u-95% CI Eff.Sample Rhat
-    ## sigma     0.89      0.01     0.87     0.91      23056 1.00
+    ##       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+    ## sigma     0.89      0.01     0.87     0.91 1.00    23249    10994
     ## 
-    ## Samples were drawn using sampling(NUTS). For each parameter, Eff.Sample 
-    ## is a crude measure of effective sample size, and Rhat is the potential 
+    ## Samples were drawn using sampling(NUTS). For each parameter, Bulk_ESS
+    ## and Tail_ESS are effective sample size measures, and Rhat is the potential
     ## scale reduction factor on split chains (at convergence, Rhat = 1).
+
+``` r
+plot(marginal_effects(fullModel), ask = FALSE)
+```
+
+![](guide_2run_brms_onCluster_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
